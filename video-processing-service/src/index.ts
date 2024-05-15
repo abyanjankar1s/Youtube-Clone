@@ -1,38 +1,65 @@
 import express from "express";
-import Ffmpeg from "fluent-ffmpeg";
+
+import {
+    uploadProcessedVideo,
+    downloadRawVideo,
+    deleteRawVideo,
+    deleteProcessedVideo,
+    convertVideo,
+    setupDirectories
+} from './storage'; 
+
+//Create the local directories for videos
+setupDirectories();
 
 const app = express();
 app.use(express.json());
 
-app.post("/process-video", (req, res) => {
-    // Get path of input video file from the req body
-    const inputFilePath = req.body.inputFilePath;
-    const outputFilePath = req.body.outputFilePath;
+//Process a video file from Cloud Storage into 360p 
+app.post('/process-video', async (req, res) => {
+    // Get the bucket and filename from the cloud Pub/Sub message
+    let data;
+    try {
+        const message = Buffer.from(req.body.message.data, 'base64').toString('utf8');
+        data = JSON.parse(message);
+        if(!data.name){
+            throw new Error('Invalid message payload received');
+        }
+    } catch (error){
+        console.error(error);
+        return res.status(400).send('Bad Request: missing filename.');
+    }
 
-    // Error handling for when incorrect file path: input or output
-    if(!inputFilePath){
-        res.status(400).send("Bad Request: Missing input file path.")
-    } else if(!outputFilePath){
-        res.status(400).send("Bad Request: Missing output file path.")
-    };
+    const inputFileName = data.name;
+    const outputFileName = `processed-${inputFileName}`;
 
-    // different outlooks on scaling, error and saving video. 
-    Ffmpeg(inputFilePath)
-    .outputOption("-vf", "scale=-1:360") //360p
-    .on("end", () => {
-        res.status(200).send("Processing Complete Successfully.")
-    })
-    .on("error", (err) => {
-        console.log(`An error occurred: ${err.message}`);
-        res.status(500).send(`Internal Server Error: ${err.message}`);
-    })
-    .save(outputFilePath);
+    //Download the raw video from Cloud Storage
+    await downloadRawVideo(inputFileName);
+
+    //Process the video into 360p
+    try {
+        await convertVideo(inputFileName, outputFileName)
+    } catch (err) {
+        await Promise.all([
+            deleteRawVideo(inputFileName),
+            deleteProcessedVideo(outputFileName)
+        ]);
+        return res.status(500).send('Processing failed');
+    }
+
+    //upload the processed video to Cloud Storage
+    await uploadProcessedVideo(outputFileName);
+
+    await Promise.all([
+        deleteRawVideo(inputFileName),
+        deleteProcessedVideo(outputFileName)
+    ]);
+
+    return res.status(200).send('Processing finished successfully');
 });
 
-// imp when we deploy but will use 3000 for dev proposes. 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-    console.log(
-`video ps lis at localhost:${port}`);
+    console.log(`Server is running on port ${port}`);
 });
- 
+
