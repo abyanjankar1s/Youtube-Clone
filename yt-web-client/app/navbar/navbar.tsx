@@ -1,10 +1,11 @@
-'use client'; 
+'use client';
 import Image from "next/image";
 import Link from "next/link";
 import styles from "./navbar.module.css"
 import SignIn from "./sign-in";
 import { useEffect, useState } from "react";
 import { onAuthStateChangedHelper } from "../firebase/firebase";
+import { User } from "firebase/auth";
 
 
 export default function Navbar(){
