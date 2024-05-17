@@ -9,6 +9,17 @@ initializeApp();
 
 const firestore = new Firestore();
 
+const videoCollectionId = 'videos';
+
+export interface Video {
+  id?: string,
+  uid?: string,
+  filename?: string,
+  status?: 'processing' | 'processed',
+  title?: string,
+  description?: string
+}
+
 export const createUser = functions.auth.user().onCreate((user) => {
   const userInfo = {
     uid: user.uid,
@@ -51,4 +62,7 @@ export const generateUploadUrl = onCall({maxInstances: 1}, async (request) => {
   return {url, fileName}
 });
 
-
+export const getVideo = onCall({maxInstances: 1}, async () => {
+  const querySnapshot = await firestore.collection(videoCollectionId).limit(10).get();
+  return querySnapshot.docs.map((doc) => doc.data() )
+})
