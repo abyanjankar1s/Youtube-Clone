@@ -20,6 +20,8 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+// firebase.ts
+console.log("Initializing Firebase app in firebase...");
 
 const auth = getAuth(app)
 
